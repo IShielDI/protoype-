@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FIN-SIGHT - AI-Powered Personal Finance App</title>
+    <title>SpendWise - AI-Powered Personal Finance App</title>
     <!-- Load Tailwind CSS from CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Configure Tailwind to use Inter font and apply dark theme -->
@@ -393,7 +393,7 @@
 
             return `
                 <main class="p-4 sm:p-6 pb-24 max-w-4xl mx-auto">
-                    <h2 class="text-2xl font-bold text-white mb-6">FIN-SIGHT Dashboard</h2>
+                    <h2 class="text-2xl font-bold text-white mb-6">SpendWise Dashboard</h2>
 
                     <!-- 1. Total Balance and Expenses -->
                     <div class="grid grid-cols-2 gap-4 mb-8">
@@ -558,7 +558,7 @@
                         <p class="text-5xl font-extrabold text-green-400">
                             ${formatCurrency(data.cashBalance)}
                         </p>
-                        <p class="text-sm text-gray-400 mt-2">Physical cash tracked by FIN-SIGHT</p>
+                        <p class="text-sm text-gray-400 mt-2">Physical cash tracked by SpendWise</p>
                     `, 'mb-6 border-2 border-green-600 ring-4 ring-green-600/30')}
 
                     <!-- Add / Withdraw Controls -->
@@ -767,11 +767,11 @@
                     ${Card(`
                         <div class="flex items-center space-x-4 border border-gray-700/50">
                             <div class="h-16 w-16 bg-indigo-600 rounded-full flex items-center justify-center text-3xl font-bold text-white">
-                                SH
+                                SW
                             </div>
                             <div>
-                                <p class="text-xl font-bold text-white">Shield</p>
-                                <p class="text-sm text-gray-400">user@finsight.app</p>
+                                <p class="text-xl font-bold text-white">SpendWise User</p>
+                                <p class="text-sm text-gray-400">user@spendwise.app</p>
                             </div>
                         </div>
                     `, 'mb-6')}
@@ -870,7 +870,7 @@
                 <header class="py-4 px-6 border-b border-gray-700/70 bg-gray-900 sticky top-0 z-10 shadow-lg">
                     <div class="flex justify-between items-center max-w-7xl mx-auto">
                         <h1 class="text-2xl font-extrabold text-white">
-                            <span class="text-indigo-400">FIN</span>-SIGHT
+                            <span class="text-indigo-400">Spend</span>Wise
                         </h1>
                         <button aria-label="Notifications" class="p-2 rounded-full transition-colors duration-200 hover:bg-gray-700 active:scale-95 text-yellow-400 hover:bg-gray-700/50">
                             ${getIcon('Bell', 20, '')}
