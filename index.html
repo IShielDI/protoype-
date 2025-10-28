@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SpendWise - AI-Powered Personal Finance App</title>
+    <title>SpendWise - AI-Powered Personal Finance App (with Gemini Advisor)</title>
     <!-- Load Tailwind CSS from CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Configure Tailwind to use Inter font and apply dark theme -->
@@ -56,6 +56,21 @@
         .nav-item-inactive:hover {
             color: #818cf8; /* indigo-300 */
         }
+        /* Custom keyframes for button loading state */
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+        /* Custom style for rendering markdown output (bold, spacing) */
+        #advisor-output p {
+            margin-bottom: 0.75rem;
+        }
+        #advisor-output strong {
+            color: #e5e7eb; /* White/Light Gray */
+        }
     </style>
 </head>
 <body class="bg-gray-900 min-h-screen text-gray-100 pb-20 sm:pb-0">
@@ -81,6 +96,8 @@
             Globe: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-globe"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>',
             DollarSign: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-dollar-sign"><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
             X: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
+            MapPin: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin"><path d="M12 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/><path d="M19.07 13.93A10 10 0 1 0 12 21.68v-1.92"/></svg>',
+            Loader: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-loader"><path d="M12 2v4"/><path d="m16.2 7.8 2.5-2.5"/><path d="M18 12h4"/><path d="m16.2 16.2 2.5 2.5"/><path d="M12 18v4"/><path d="m7.8 16.2-2.5 2.5"/><path d="M6 12H2"/><path d="m7.8 7.8-2.5-2.5"/></svg>',
         };
 
         // Utility to get a styled SVG icon
@@ -92,14 +109,38 @@
     </script>
 
     <script>
+        // --- Gemini API Configuration (Mandatory) ---
+        const apiKey = "";
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+
         // --- Simulated Backend Data and Configuration ---
         const categoryColors = {
-            Food: 'bg-red-500/50 text-red-300 ring-red-500/40',
-            Travel: 'bg-cyan-500/50 text-cyan-300 ring-cyan-500/40',
-            Shopping: 'bg-fuchsia-500/50 text-fuchsia-300 ring-fuchsia-500/40',
-            Bills: 'bg-yellow-500/50 text-yellow-300 ring-yellow-500/40',
-            Subscriptions: 'bg-indigo-500/50 text-indigo-300 ring-indigo-500/40',
-            Other: 'bg-gray-500/50 text-gray-300 ring-gray-500/40',
+            // Updated structure to include a simple hex code for Canvas drawing
+            Food: {
+                tailwind: 'bg-red-500/50 text-red-300 ring-red-500/40',
+                hex: '#ef4444' // red-500
+            },
+            Travel: {
+                tailwind: 'bg-cyan-500/50 text-cyan-300 ring-cyan-500/40',
+                hex: '#06b6d4' // cyan-500
+            },
+            Shopping: {
+                tailwind: 'bg-fuchsia-500/50 text-fuchsia-300 ring-fuchsia-500/40',
+                hex: '#d946ef' // fuchsia-500
+            },
+            Bills: {
+                tailwind: 'bg-yellow-500/50 text-yellow-300 ring-yellow-500/40',
+                hex: '#f59e0b' // yellow-500
+            },
+            Subscriptions: {
+                tailwind: 'bg-indigo-500/50 text-indigo-300 ring-indigo-500/40',
+                hex: '#6366f1' // indigo-500
+            },
+            Other: {
+                tailwind: 'bg-gray-500/50 text-gray-300 ring-gray-500/40',
+                hex: '#6b7280' // gray-500
+            },
         };
 
         const initialFinancialData = {
@@ -112,6 +153,12 @@
                 Shopping: 6000,
                 Bills: 4000,
                 Subscriptions: 2000,
+                Other: 0
+            },
+            budgets: {
+                Food: 10000,
+                Shopping: 8000,
+                Bills: 5000, // Budget to be checked against
             },
             goal: {
                 name: 'Emergency Fund',
@@ -120,15 +167,29 @@
                 projectedDate: 'Dec 2025',
             },
             transactions: [
-                { id: 5, date: 'Oct 26', amount: -1200, category: 'Food', notes: 'Monthly grocery shop', type: 'UPI' },
-                { id: 1, date: 'Oct 25', amount: -500, category: 'Food', notes: 'Dinner at Pizzeria', type: 'Card' },
-                { id: 2, date: 'Oct 24', amount: -2000, category: 'Shopping', notes: 'New headphones', type: 'UPI' },
-                { id: 3, date: 'Oct 23', amount: 500, category: 'Cash', notes: 'ATM Withdrawal', type: 'Digital to Cash' },
+                // Added a mock location to one transaction for demonstration
+                { 
+                    id: 10, 
+                    date: 'Oct 28', 
+                    amount: -2500, 
+                    category: 'Subscriptions', 
+                    notes: 'Software renewal fee', 
+                    type: 'Card',
+                    location: { lat: 12.9716, lng: 77.5946 } // Mock location: Bangalore, India
+                },
+                { id: 9, date: 'Oct 27', amount: -1500, category: 'Shopping', notes: 'New shirt and trousers', type: 'UPI' },
+                { id: 8, date: 'Oct 26', amount: -1200, category: 'Food', notes: 'Monthly grocery shop', type: 'UPI' },
+                { id: 7, date: 'Oct 25', amount: -500, category: 'Food', notes: 'Dinner at Pizzeria', type: 'Card' },
+                { id: 6, date: 'Oct 24', amount: -2000, category: 'Shopping', notes: 'New headphones', type: 'UPI' },
+                { id: 5, date: 'Oct 23', amount: 500, category: 'Cash', notes: 'ATM Withdrawal', type: 'Digital to Cash' },
                 { id: 4, date: 'Oct 22', amount: -1500, category: 'Travel', notes: 'Weekend Train Ticket', type: 'Card' },
+                { id: 3, date: 'Oct 21', amount: -1000, category: 'Bills', notes: 'Electricity bill', type: 'UPI' },
+                { id: 2, date: 'Oct 20', amount: -3000, category: 'Bills', notes: 'Rent installment', type: 'Card' },
+                { id: 1, date: 'Oct 19', amount: -800, category: 'Food', notes: 'Lunch with colleagues', type: 'Cash' },
             ]
         };
 
-        const aiInsights = [
+        const staticAiInsights = [
             { id: 1, type: 'alert', text: 'You might **overspend on dining** this week. Dining out trend is up 12%' },
             { id: 2, type: 'tip', text: 'Use grocery coupons this week to save **₹200**. Check Smart Shopping!' },
             { id: 3, type: 'goal', text: 'Reduce online shopping by 15% to reach your **savings goal faster**.' },
@@ -143,15 +204,33 @@
         // --- Global State Management ---
         let appData = initialFinancialData;
         let currentView = 'dashboard';
+        let transactionFilter = 'All';
+        // Existing: State for transient location data during expense input
+        let currentCapturedLocation = null; 
+        
+        // NEW: LLM Advisor State
+        let advisorAnalysis = null; // Stores the generated markdown text
+        let isAnalysisLoading = false; // Loading indicator for the API call
 
         const setView = (newView) => {
             currentView = newView;
+            // Clear location state whenever switching away from or to the AddExpense screen
+            if (newView !== 'addExpense') {
+                 currentCapturedLocation = null;
+            }
+            renderApp();
+        };
+
+        const setTransactionFilter = (newFilter) => {
+            transactionFilter = newFilter;
             renderApp();
         };
 
         // --- Utility Functions ---
 
         const formatCurrency = (amount) => `₹${Math.abs(amount).toLocaleString('en-IN')}`;
+        
+        const formatCoordinates = (lat, lng) => `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
 
         const calculateCategoryList = (data) => {
             const total = data.totalExpenses;
@@ -159,11 +238,139 @@
                 name,
                 amount,
                 percentage: total > 0 ? (amount / total) * 100 : 0,
-                color: categoryColors[name] || 'bg-gray-500'
+                color: categoryColors[name] ? categoryColors[name].tailwind : 'bg-gray-500', // Use tailwind class
+                hexColor: categoryColors[name] ? categoryColors[name].hex : '#6b7280', // Use hex color
             }));
         };
 
+        const getDynamicInsights = (data) => {
+            const dynamicInsights = [];
+            
+            const billsBudget = data.budgets.Bills || 0;
+            const billsSpent = data.categoryExpenses.Bills || 0;
+            const budgetUtilization = billsSpent / billsBudget;
+
+            if (billsBudget > 0 && budgetUtilization >= 0.90) { 
+                 const percentOver = Math.round((budgetUtilization - 1) * 100);
+                 const overText = budgetUtilization > 1 ? `You are **${percentOver}% over budget**!` : `You are **90% utilized** on your Bills budget.`;
+                 
+                 dynamicInsights.push({
+                    id: 101, 
+                    type: 'alert', 
+                    text: `Budget Alert for **Bills**: ${overText}. Consider pausing discretionary spending.` 
+                });
+            }
+
+            if (data.totalExpenses > 30000) {
+                dynamicInsights.push({
+                    id: 102, 
+                    type: 'alert', 
+                    text: `High Spending Month! Total expenses exceed **₹30,000**. Review your 'Shopping' category.` 
+                });
+            }
+
+            return dynamicInsights;
+        };
+        // --- Chart Drawing Function (Existing Feature) ---
+
+        const createPieChart = (categories, canvasId) => {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+            const size = 300; 
+            const centerX = size / 2;
+            const centerY = size / 2;
+            const radius = 100;
+            let currentAngle = 0; 
+
+            // Set high resolution for better visual quality
+            canvas.width = size * 2;
+            canvas.height = size * 2;
+            ctx.scale(2, 2); 
+
+            ctx.clearRect(0, 0, size, size);
+
+            categories.forEach(category => {
+                if (category.percentage > 0) {
+                    const sliceAngle = (category.percentage / 100) * 2 * Math.PI;
+                    const endAngle = currentAngle + sliceAngle;
+
+                    ctx.beginPath();
+                    ctx.fillStyle = category.hexColor;
+                    ctx.moveTo(centerX, centerY);
+                    ctx.arc(centerX, centerY, radius, currentAngle, endAngle);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.strokeStyle = '#1f2937'; // gray-800
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+
+                    currentAngle = endAngle;
+                }
+            });
+
+            // Draw a central hole (donut effect)
+            ctx.beginPath();
+            ctx.fillStyle = '#1f2937'; // gray-800 (matches card background)
+            ctx.arc(centerX, centerY, 55, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Draw Center Text
+            ctx.fillStyle = '#e5e7eb'; // light gray text
+            ctx.font = 'bold 20px Inter';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('Total', centerX, centerY - 12);
+
+            ctx.font = 'bold 16px Inter';
+            ctx.fillStyle = '#94a3b8'; // slategray
+            ctx.fillText(formatCurrency(appData.totalExpenses), centerX, centerY + 12);
+        };
+
+
         // --- Data Mutators ---
+
+        // Location Capture Handler (Existing Feature)
+        const captureLocation = () => {
+            const statusDiv = document.getElementById('location-status');
+            if (!statusDiv) return;
+
+            if (!navigator.geolocation) {
+                statusDiv.innerHTML = `<span class="text-red-400">${getIcon('X', 18, 'mr-2')} Geolocation is not supported by your browser.</span>`;
+                return;
+            }
+
+            // Show loading state
+            statusDiv.innerHTML = `<span class="text-yellow-400 flex items-center">${getIcon('Loader', 18, 'mr-2 animate-spin')} Capturing location...</span>`;
+            statusDiv.classList.remove('hidden');
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    currentCapturedLocation = { lat, lng };
+
+                    // Display success
+                    statusDiv.innerHTML = `<span class="text-green-400 flex items-center">${getIcon('Check', 18, 'mr-2')} Location captured: ${formatCoordinates(lat, lng)}</span>`;
+                },
+                (error) => {
+                    currentCapturedLocation = null;
+                    let errorMessage = "Location capture failed.";
+                    if (error.code === error.PERMISSION_DENIED) {
+                        errorMessage = "Access denied. Please allow location access to record it.";
+                    } else if (error.code === error.TIMEOUT) {
+                        errorMessage = "Location request timed out. Try again.";
+                    }
+                    // Display error
+                    statusDiv.innerHTML = `<span class="text-red-400 flex items-center">${getIcon('X', 18, 'mr-2')} ${errorMessage}</span>`;
+                },
+                // Options for getCurrentPosition
+                { enableHighAccuracy: false, timeout: 5000, maximumAge: 0 }
+            );
+        };
+
 
         const handleAddExpense = (amount, category, paymentType, notes) => {
             let newDigitalBalance = appData.digitalBalance;
@@ -189,6 +396,8 @@
                 category,
                 notes: notes || 'Manual entry',
                 type: paymentType,
+                // NEW: Include captured location
+                location: currentCapturedLocation
             };
 
             appData = {
@@ -200,11 +409,14 @@
                 transactions: [newTransaction, ...appData.transactions],
             };
             
+            // Reset transient location state after successful save
+            currentCapturedLocation = null;
+
             // Show confirmation toast
             showToast('Expense added successfully!', 'green');
 
             // Re-render only if we are still on the dashboard or relevant screen
-            if (currentView === 'dashboard') renderApp();
+            if (currentView === 'dashboard' || currentView === 'addExpense') renderApp();
         };
 
         const handleCashTransaction = (amount, type) => {
@@ -226,6 +438,7 @@
                 if (newCashBalance < amount) {
                     showToast('Insufficient cash balance!', 'red');
                     return;
+                    
                 }
                 newDigitalBalance += amount;
                 newCashBalance -= amount;
@@ -258,6 +471,112 @@
             handleAddExpense(amount, 'Shopping', 'Card', 'Smart Shopping Purchase');
             setView('dashboard');
         };
+
+        // --- Gemini LLM Advisor Functions ---
+
+        /**
+         * Creates a detailed text prompt based on the current financial data.
+         */
+        const generateAdvisorPrompt = (data) => {
+            // Calculate a simplified income estimate for context
+            const totalIncome = data.digitalBalance + data.cashBalance + data.totalExpenses; 
+            
+            // Generate spending status relative to budget
+            const categoryStatus = Object.entries(data.categoryExpenses).map(([name, spent]) => {
+                const budget = data.budgets[name];
+                if (budget) {
+                    const status = spent > budget 
+                        ? `(OVER BUDGET by ${formatCurrency(spent - budget)})` 
+                        : `(Under budget, ${formatCurrency(budget - spent)} remaining)`;
+                    return `- ${name}: Spent ${formatCurrency(spent)} / Budget ${formatCurrency(budget)} ${status}`;
+                }
+                return `- ${name}: Spent ${formatCurrency(spent)}`;
+            }).join('\n');
+
+            const goalStatus = `- Savings Goal: ${data.goal.name}\n- Target: ${formatCurrency(data.goal.target)}\n- Current Progress: ${formatCurrency(data.goal.current)}\n- Projected Completion: ${data.goal.projectedDate}`;
+
+            return `
+                Analyze the following personal finance data and provide a concise, actionable report:
+
+                --- Financial Snapshot ---
+                Total Available Balance: ${formatCurrency(data.digitalBalance + data.cashBalance)}
+                Total Income (Simulated Monthly): ${formatCurrency(totalIncome)}
+                Total Expenses (This Period): ${formatCurrency(data.totalExpenses)}
+                
+                --- Spending Breakdown ---
+                ${categoryStatus}
+
+                --- Savings Goal ---
+                ${goalStatus}
+
+                --- Analysis Request ---
+                1. Summarize the user's overall financial health and current trajectory (1 sentence).
+                2. Identify the single most critical area for spending reduction based on the data and provide one specific, actionable strategy for that area.
+                3. Give one piece of positive encouragement regarding their savings goal.
+
+                Format your response using Markdown, with bold titles for each section.
+            `;
+        };
+        
+        /**
+         * Calls the Gemini API with the financial data prompt using exponential backoff.
+         */
+        const callGeminiAdvisor = async () => {
+            if (isAnalysisLoading) return;
+
+            isAnalysisLoading = true;
+            advisorAnalysis = null;
+            renderApp(); // Update UI to show loading state
+
+            const userQuery = generateAdvisorPrompt(appData);
+            const systemPrompt = "You are SpendWise AI Advisor, a helpful, objective, and empathetic financial coach. Your response must be formatted as a single, easy-to-read block of text using standard Markdown for styling (e.g., **Title** for headings). Only output the analysis content.";
+            const maxRetries = 3;
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+            };
+
+            for (let attempt = 0; attempt < maxRetries; attempt++) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        // Throw error to trigger retry if HTTP status is bad
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                    if (text) {
+                        advisorAnalysis = text;
+                        break; // Success, exit loop
+                    } else {
+                        throw new Error("Gemini response lacked text content.");
+                    }
+
+                } catch (error) {
+                    console.error(`Attempt ${attempt + 1} failed:`, error);
+                    if (attempt === maxRetries - 1) {
+                        // Last attempt failed
+                        advisorAnalysis = `<p class="text-red-400 text-center">❌ **Error:** Failed to connect to the Financial Advisor after several retries. Please try again later.</p>`;
+                    } else {
+                        // Wait with exponential backoff before retrying
+                        const delay = Math.pow(2, attempt) * 1000;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    }
+                }
+            }
+
+            isAnalysisLoading = false;
+            renderApp(); // Update UI to show result or final error
+        };
+
 
         // --- Toast/Modal Functionality (No alert/confirm) ---
 
@@ -302,17 +621,18 @@
             `, 'border border-gray-700/50')}
         `;
 
-        const CategoryBar = (name, amount, totalExpenses, colorClass) => {
+        const CategoryBar = (name, amount, totalExpenses, colorClass, hexColor) => {
             const percentage = totalExpenses > 0 ? (amount / totalExpenses) * 100 : 0;
             const percentageRounded = percentage.toFixed(1);
 
-            // Extract the background color part for the inner bar
             const barColorClasses = colorClass.split(' ').slice(0, 2).join(' ').replace(/\/50/g, '');
 
-            // FIX: Removed complex absolute positioning and moved percentage next to amount for better stability
             return Card(`
                 <div class="flex justify-between items-end mb-2">
-                    <span class="font-semibold text-gray-200">${name}</span>
+                    <span class="font-semibold text-gray-200 flex items-center">
+                         <span class="inline-block w-2.5 h-2.5 rounded-full mr-2" style="background-color: ${hexColor}"></span>
+                         ${name}
+                    </span>
                     <span class="text-lg font-bold text-gray-300 flex items-baseline">
                         ${formatCurrency(amount)}
                         <span class="ml-2 text-xs font-medium text-gray-500">(${percentageRounded}%)</span>
@@ -327,21 +647,27 @@
             `, 'p-3 cursor-pointer hover:ring-2 hover:ring-indigo-500/50 transition duration-150');
         };
         
-        // NEW: Reusable component for displaying a single transaction row
+        // Reusable component for displaying a single transaction row
         const TransactionRow = (t) => {
             const isExpense = t.amount < 0;
-            // Classify transfers (e.g., Digital to Cash) as a distinct type
             const isTransfer = t.category === 'Cash' && t.type.includes('to');
-            const sign = isExpense ? '-' : (isTransfer ? '' : '+'); // Transfers don't need a visible sign
+            const sign = isExpense ? '-' : (isTransfer ? '' : '+'); 
             const colorClass = isExpense ? 'text-red-400' : (isTransfer ? 'text-yellow-400' : 'text-green-400');
             
-            // Get base category color for the icon background
-            const baseColorClass = categoryColors[t.category] ? categoryColors[t.category].split('/')[0] : 'bg-gray-600';
+            const categoryKey = t.category in categoryColors ? t.category : 'Other'; 
+            const baseColorClass = categoryColors[categoryKey] ? categoryColors[categoryKey].tailwind.split('/')[0] : 'bg-gray-600';
+
+            const locationDisplay = t.location ? `
+                <div class="text-xs text-gray-500 mt-1 flex items-center">
+                    ${getIcon('MapPin', 12, 'text-indigo-400 mr-1')}
+                    ${formatCoordinates(t.location.lat, t.location.lng)}
+                </div>
+            ` : '';
 
             return `
                 <div class="flex items-center justify-between p-3 border-b border-gray-700/50 hover:bg-gray-800/50 transition duration-150">
                     <!-- Icon & Details -->
-                    <div class="flex items-center space-x-3 min-w-0">
+                    <div class="flex items-start space-x-3 min-w-0">
                         <div class="p-2 rounded-full ring-1 ring-gray-600 ${baseColorClass} flex-shrink-0 text-white">
                             ${getIcon('DollarSign', 16, '')}
                         </div>
@@ -350,6 +676,7 @@
                             <p class="text-xs text-gray-400">
                                 ${t.category} • ${t.type}
                             </p>
+                            ${locationDisplay}
                         </div>
                     </div>
                     <!-- Date & Amount -->
@@ -361,19 +688,20 @@
             `;
         };
 
-
         // --- Screen Rendering Functions ---
 
         const renderDashboardScreen = () => {
             const data = appData;
             const categoryList = calculateCategoryList(data);
             const goalProgress = (data.goal.current / data.goal.target) * 100;
+            
+            const allInsights = [...staticAiInsights, ...getDynamicInsights(data)];
 
             let categoriesHtml = categoryList.map(cat =>
-                CategoryBar(cat.name, cat.amount, data.totalExpenses, cat.color)
+                CategoryBar(cat.name, cat.amount, data.totalExpenses, cat.color, cat.hexColor)
             ).join('');
 
-            let insightsHtml = aiInsights.map(insight => {
+            let insightsHtml = allInsights.map(insight => {
                 const color = insight.type === 'alert' ? 'red' : 'indigo';
                 const ring = insight.type === 'alert' ? 'ring-red-600/30' : 'ring-indigo-600/30';
                 const textClass = insight.type === 'alert' ? 'text-red-200' : 'text-gray-200';
@@ -388,8 +716,17 @@
                 `, `p-4 border-2 border-${color}-600 ${ring}`);
             }).join('');
             
-            // NEW: Recent Transactions list for the Dashboard
-            const allTransactionsHtml = data.transactions.slice(0, 5).map(TransactionRow).join('');
+            const filteredTransactions = data.transactions.filter(t => 
+                transactionFilter === 'All' || t.category === transactionFilter
+            );
+
+            const filterOptions = ['All', ...Object.keys(categoryColors)].map(cat => 
+                `<option value="${cat}" ${cat === transactionFilter ? 'selected' : ''}>${cat}</option>`
+            ).join('');
+
+            const allTransactionsHtml = filteredTransactions.length > 0
+                ? filteredTransactions.map(TransactionRow).join('')
+                : '<p class="text-center text-gray-500 py-4">No transactions recorded for this filter.</p>';
 
             return `
                 <main class="p-4 sm:p-6 pb-24 max-w-4xl mx-auto">
@@ -401,10 +738,22 @@
                         ${TotalDisplay("Total Expenses This Month", data.totalExpenses, 'TrendingUp', 'text-fuchsia-400')}
                     </div>
 
-                    <!-- 2. Expense Categories Section -->
+                    <!-- 2. Expense Categories Section (With Chart) -->
                     <h3 class="text-xl font-semibold text-white mb-4 border-b border-gray-700 pb-2">Category Breakdown</h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-                        ${categoriesHtml}
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 items-center">
+                        <!-- Pie Chart Column -->
+                        <div class="flex justify-center lg:justify-start">
+                            <div class="w-full max-w-xs aspect-square">
+                                <!-- Canvas for the Pie Chart -->
+                                <canvas id="category-pie-chart" class="w-full h-full"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Category List Column -->
+                        <div class="space-y-3">
+                            ${categoriesHtml}
+                        </div>
                     </div>
 
                     <!-- 3. AI Insights Section -->
@@ -436,13 +785,28 @@
                         </div>
                     `)}
                     
-                    <!-- 5. Recent Transactions List (Added for clarity on amounts) -->
-                    <h3 class="text-xl font-semibold text-white mt-8 mb-4 border-b border-gray-700 pb-2">Recent Transactions</h3>
+                    <!-- 5. Filterable Transactions List -->
+                    <h3 class="text-xl font-semibold text-white mt-8 mb-4 border-b border-gray-700 pb-2">
+                        Transactions
+                    </h3>
+                    
+                    <!-- Filter Control -->
+                    <div class="mb-4">
+                        <label for="transaction-filter" class="block text-sm font-medium text-gray-300 mb-1">Filter by Category:</label>
+                        <select
+                            id="transaction-filter"
+                            class="w-full sm:w-1/2 p-3 rounded-lg bg-gray-700 border border-gray-600 text-white focus:ring-indigo-500 focus:border-indigo-500"
+                            onchange="setTransactionFilter(this.value)"
+                        >
+                            ${filterOptions}
+                        </select>
+                    </div>
+
                     ${Card(`
                         <div class="divide-y divide-gray-700/50 -mx-5">
-                            ${allTransactionsHtml.length > 0 ? allTransactionsHtml : '<p class="text-center text-gray-500 py-4">No recent transactions recorded.</p>'}
+                            ${allTransactionsHtml}
                         </div>
-                    `, 'p-0')} <!-- p-0 to allow list items to control padding -->
+                    `, 'p-0')}
                 </main>
             `;
         };
@@ -451,13 +815,26 @@
             const categories = Object.keys(categoryColors);
             const categoriesOptions = categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
 
+            let locationStatusContent = '';
+            if (currentCapturedLocation) {
+                 locationStatusContent = `<span class="text-green-400 flex items-center">${getIcon('Check', 18, 'mr-2')} Location captured: ${formatCoordinates(currentCapturedLocation.lat, currentCapturedLocation.lng)}</span>`;
+            } else {
+                 locationStatusContent = `<span class="text-gray-400 flex items-center">${getIcon('MapPin', 18, 'mr-2')} No location recorded for this expense.</span>`;
+            }
+
             return `
                 <main class="p-4 sm:p-6 pb-24 max-w-md mx-auto">
                     <h2 class="text-3xl font-bold text-white mb-6">Record New Expense</h2>
                     ${Card(`
                         <form id="add-expense-form" class="space-y-5">
+                            <!-- Error Message Container -->
+                            <div id="form-error-message" class="hidden p-3 bg-red-600/30 text-red-300 rounded-lg text-sm flex items-center">
+                                ${getIcon('X', 20, 'mr-2')}
+                                <span id="error-text"></span>
+                            </div>
+                            
                             <div>
-                                <label class="block text-sm font-medium text-gray-300 mb-1">Amount (₹)</label>
+                                <label for="expense-amount" class="block text-sm font-medium text-gray-300 mb-1">Amount (₹)</label>
                                 <input
                                     type="number"
                                     id="expense-amount"
@@ -470,9 +847,10 @@
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-300 mb-1">Category</label>
+                                <label for="expense-category" class="block text-sm font-medium text-gray-300 mb-1">Category</label>
                                 <select
                                     id="expense-category"
+                                    required
                                     class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-white focus:ring-indigo-500 focus:border-indigo-500"
                                 >
                                     ${categoriesOptions}
@@ -480,9 +858,10 @@
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-300 mb-1">Payment Type</label>
+                                <label for="expense-payment-type" class="block text-sm font-medium text-gray-300 mb-1">Payment Type</label>
                                 <select
                                     id="expense-payment-type"
+                                    required
                                     class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-white focus:ring-indigo-500 focus:border-indigo-500"
                                 >
                                     <option value="Card">Card</option>
@@ -490,9 +869,21 @@
                                     <option value="Cash">Cash</option>
                                 </select>
                             </div>
+                            
+                            <!-- Location Tracking Section (Existing Feature) -->
+                            <div class="space-y-2">
+                                <h4 class="text-sm font-medium text-gray-300">Location Tracking</h4>
+                                <div id="location-status" class="p-2 text-sm rounded-lg bg-gray-700/50">
+                                    ${locationStatusContent}
+                                </div>
+                                <button type="button" id="capture-location-button" class="w-full py-2 text-sm rounded-xl font-bold transition-all duration-300 active:scale-[0.98] bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 flex items-center justify-center">
+                                    ${getIcon('MapPin', 18, 'mr-2')}
+                                    Capture Current Location
+                                </button>
+                            </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-300 mb-1">Notes (Optional)</label>
+                                <label for="expense-notes" class="block text-sm font-medium text-gray-300 mb-1">Notes (Optional)</label>
                                 <input
                                     type="text"
                                     id="expense-notes"
@@ -503,7 +894,7 @@
 
                             <div class="flex space-x-3">
                                 <button type="button" id="undo-button" class="flex-1 w-full py-3 rounded-xl font-bold transition-all duration-300 active:scale-[0.98] bg-red-600/50 hover:bg-red-600/70 shadow-none text-white">
-                                    Undo / Clear
+                                    Clear Form
                                 </button>
                                 <button type="submit" class="flex-1 w-full py-3 rounded-xl font-bold transition-all duration-300 active:scale-[0.98] shadow-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/50">
                                     Submit Expense
@@ -518,9 +909,8 @@
         const renderSmartWalletScreen = () => {
             const data = appData;
             const cashTransactions = data.transactions.filter(t => t.type === 'Cash' || t.type.includes('Cash'));
-            const isAlertActive = true; // Simulated alert state
+            const isAlertActive = true; 
 
-            // Use the new TransactionRow component
             const transactionsHtml = cashTransactions.length > 0
                 ? cashTransactions.map(TransactionRow).join('')
                 : '<p class="text-center text-gray-500 py-4">No recent cash movements.</p>';
@@ -561,9 +951,13 @@
                         <p class="text-sm text-gray-400 mt-2">Physical cash tracked by SpendWise</p>
                     `, 'mb-6 border-2 border-green-600 ring-4 ring-green-600/30')}
 
-                    <!-- Add / Withdraw Controls -->
+                    <!-- Add / Withdraw Controls (Improved UX) -->
                     ${Card(`
                         <h3 class="text-xl font-semibold text-white">Manage Cash</h3>
+                        <div id="cash-management-error" class="hidden p-3 bg-red-600/30 text-red-300 rounded-lg text-sm flex items-center mb-4">
+                            ${getIcon('X', 20, 'mr-2')}
+                            <span id="cash-error-text"></span>
+                        </div>
                         <input
                             type="number"
                             id="cash-amount"
@@ -595,8 +989,8 @@
         };
 
         const renderSmartShoppingScreen = () => {
-            const isSearching = false; // Simplified for HTML version
-            const searchRecs = smartShoppingRecs; // Use mock data
+            const isSearching = false; 
+            const searchRecs = smartShoppingRecs; 
 
             const recsHtml = searchRecs.length > 0 ? searchRecs.map(item => `
                 ${Card(`
@@ -657,7 +1051,26 @@
                 </main>
             `;
         };
+        
+        // Helper function for rendering the Advisor section states
+        const renderInitialAdvisorState = () => `
+            <div class="text-center py-4">
+                <p class="text-gray-400 mb-3">Tap the button below to generate a detailed, personalized financial report based on your current spending data and goals.</p>
+                <p class="text-sm font-semibold text-indigo-400 flex items-center justify-center">
+                    <span class="w-2 h-2 rounded-full bg-indigo-400 mr-2 animate-pulse"></span>
+                    Powered by Gemini AI.
+                </p>
+            </div>
+        `;
 
+        const renderLoadingState = () => `
+            <div class="text-center py-8 flex flex-col items-center">
+                ${getIcon('Loader', 32, 'text-accent animate-spin')}
+                <p class="mt-4 text-white font-semibold">Analyzing your data...</p>
+                <p class="text-sm text-gray-400">This may take a few moments.</p>
+            </div>
+        `;
+        
         const renderInsightsScreen = () => {
             const weeklySpending = [2000, 3500, 4200, 5000, 4800]; // Simulated spending for 5 weeks
             const maxSpending = Math.max(...weeklySpending);
@@ -682,14 +1095,47 @@
                     </div>
                 `;
             }).join('');
+            
+            // Determine content for the advisor output area
+            let advisorContent = '';
+            if (isAnalysisLoading) {
+                advisorContent = renderLoadingState();
+            } else if (advisorAnalysis) {
+                // Simple markdown rendering for the output
+                const formattedAnalysis = advisorAnalysis
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold text
+                    .replace(/^- /gm, '<p class="pl-4 text-gray-300">') // Replace bullet list
+                    .replace(/\n\n/g, '</p><p class="text-gray-300">') // Replace double newline with paragraph tag
+                    .replace(/\n/g, '<br>'); // Handle single newlines
+
+                advisorContent = `<div class="p-4 text-gray-300 text-sm leading-relaxed">${formattedAnalysis}</div>`;
+            } else {
+                advisorContent = renderInitialAdvisorState();
+            }
+
 
             return `
                 <main class="p-4 sm:p-6 pb-24 max-w-4xl mx-auto">
                     <h2 class="text-3xl font-bold text-white mb-6">Insights & Behavioral Analysis</h2>
 
+                    <!-- LLM Advisor Section -->
+                    <h3 class="text-xl font-semibold text-white mt-8 mb-4 border-b border-gray-700 pb-2 flex items-center">
+                        Personalized Budget Advisor ✨
+                    </h3>
+                    
+                    ${Card(`
+                        <div id="advisor-output" class="min-h-[150px] flex flex-col justify-center items-center">
+                            ${advisorContent}
+                        </div>
+                        
+                        <button id="run-advisor-button" class="mt-4 w-full py-3 rounded-xl font-bold transition-all duration-300 active:scale-[0.98] shadow-lg ${isAnalysisLoading ? 'bg-gray-700 cursor-not-allowed text-gray-400' : 'bg-accent hover:bg-fuchsia-500 shadow-fuchsia-600/50 text-white'}" ${isAnalysisLoading ? 'disabled' : ''}>
+                            ${isAnalysisLoading ? getIcon('Loader', 20, 'mr-2 animate-spin') : `${getIcon('Zap', 20, 'mr-2')} Get Personalized Budget Analysis ✨`}
+                        </button>
+                    `, 'mb-8')}
+
                     <!-- Spending Personality -->
                     <h3 class="text-xl font-semibold text-white mb-4 border-b border-gray-700 pb-2 flex items-center">
-                        ${getIcon('Zap', 20, 'text-indigo-400 mr-2')} Spending Personality
+                        ${getIcon('Zap', 20, 'text-indigo-400 mr-2')} Spending Personality (Simulated)
                     </h3>
                     ${Card(`
                         <p class="text-4xl font-extrabold text-indigo-400 mb-2">Impulsive Spender</p>
@@ -918,8 +1364,32 @@
             });
 
             // 2. Screen-Specific Listeners (only run if the screen is visible)
+            if (currentView === 'dashboard') {
+                // Call the chart creation function after the dashboard content is in the DOM
+                const categoryList = calculateCategoryList(appData);
+                createPieChart(categoryList, 'category-pie-chart');
+            }
+            
             if (currentView === 'addExpense') {
                 const form = document.getElementById('add-expense-form');
+                const errorDiv = document.getElementById('form-error-message');
+                const errorText = document.getElementById('error-text');
+                const captureButton = document.getElementById('capture-location-button');
+
+                const validateForm = (amount) => {
+                    if (isNaN(amount) || amount <= 0) {
+                        errorText.textContent = "Please enter a valid amount greater than zero.";
+                        errorDiv.classList.remove('hidden');
+                        return false;
+                    }
+                    errorDiv.classList.add('hidden');
+                    return true;
+                };
+
+                if (captureButton) {
+                    captureButton.onclick = captureLocation;
+                }
+
                 if (form) {
                     form.onsubmit = (e) => {
                         e.preventDefault();
@@ -928,12 +1398,15 @@
                         const paymentType = document.getElementById('expense-payment-type').value;
                         const notes = document.getElementById('expense-notes').value;
 
-                        if (amount > 0) {
+                        if (validateForm(amount)) {
                             handleAddExpense(amount, category, paymentType, notes);
                             // Clear form fields
                             form.reset();
-                            document.getElementById('expense-category').value = 'Food'; // Reset dropdowns manually
+                            document.getElementById('expense-category').value = 'Food'; 
                             document.getElementById('expense-payment-type').value = 'Card';
+                            
+                            // Re-render to update the location status display
+                            renderApp(); 
                         }
                     };
                 }
@@ -942,20 +1415,35 @@
                 if (undoButton) {
                     undoButton.onclick = () => {
                         form.reset();
+                        currentCapturedLocation = null; // Clear captured location on form clear
                         document.getElementById('expense-category').value = 'Food';
                         document.getElementById('expense-payment-type').value = 'Card';
+                        errorDiv.classList.add('hidden'); 
                         showToast('Form cleared (simulated undo).', 'red');
+                        renderApp(); // Re-render to clear location status
                     };
                 }
             } else if (currentView === 'wallet') {
                 const amountInput = document.getElementById('cash-amount');
                 const addButton = document.getElementById('add-cash-button');
                 const withdrawButton = document.getElementById('withdraw-cash-button');
+                const errorDiv = document.getElementById('cash-management-error');
+                const errorText = document.getElementById('cash-error-text');
+
+                const validateCashForm = (amount) => {
+                    if (isNaN(amount) || amount <= 0) {
+                        errorText.textContent = "Please enter a valid amount greater than zero.";
+                        errorDiv.classList.remove('hidden');
+                        return false;
+                    }
+                    errorDiv.classList.add('hidden');
+                    return true;
+                };
 
                 if (addButton) {
                     addButton.onclick = () => {
                         const amount = parseFloat(amountInput.value);
-                        if (amount > 0) handleCashTransaction(amount, 'add');
+                        if (validateCashForm(amount)) handleCashTransaction(amount, 'add');
                         amountInput.value = '';
                     };
                 }
@@ -963,7 +1451,7 @@
                 if (withdrawButton) {
                     withdrawButton.onclick = () => {
                         const amount = parseFloat(amountInput.value);
-                        if (amount > 0) handleCashTransaction(amount, 'withdraw');
+                        if (validateCashForm(amount)) handleCashTransaction(amount, 'withdraw');
                         amountInput.value = '';
                     };
                 }
@@ -977,6 +1465,11 @@
                         }
                     };
                 });
+            } else if (currentView === 'insights') {
+                const advisorButton = document.getElementById('run-advisor-button');
+                if (advisorButton) {
+                    advisorButton.onclick = callGeminiAdvisor;
+                }
             } else if (currentView === 'profile') {
                 // Event listeners for toggle switches (simulated)
                 document.querySelectorAll('[id^="toggle-"]').forEach(toggle => {
